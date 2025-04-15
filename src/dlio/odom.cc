@@ -12,38 +12,43 @@
 
 #include "dlio/odom.h"
 
+// Constructor for the OdomNode class
 dlio::OdomNode::OdomNode(ros::NodeHandle node_handle) : nh(node_handle) {
-
+  // Load parameters from ROS parameter server
   this->getParams();
 
+  // Initialize thread count
   this->num_threads_ = omp_get_max_threads();
 
+  // Initialize various flags and states
   this->dlio_initialized = false;
   this->first_valid_scan = false;
   this->first_imu_received = false;
-  if (this->imu_calibrate_) {this->imu_calibrated = false;}
-  else {this->imu_calibrated = true;}
+  this->imu_calibrated = !this->imu_calibrate_;
   this->deskew_status = false;
   this->deskew_size = 0;
 
-  this->lidar_sub = this->nh.subscribe("pointcloud", 1,
-      &dlio::OdomNode::callbackPointCloud, this, ros::TransportHints().tcpNoDelay());
-  this->imu_sub = this->nh.subscribe("imu", 1000,
-      &dlio::OdomNode::callbackImu, this, ros::TransportHints().tcpNoDelay());
+  // Subscribe to LiDAR and IMU topics
+  this->lidar_sub = this->nh.subscribe("pointcloud", 1, &dlio::OdomNode::callbackPointCloud, this, ros::TransportHints().tcpNoDelay());
+  this->imu_sub = this->nh.subscribe("imu", 1000, &dlio::OdomNode::callbackImu, this, ros::TransportHints().tcpNoDelay());
 
-  this->odom_pub     = this->nh.advertise<nav_msgs::Odometry>("odom", 1, true);
-  this->pose_pub     = this->nh.advertise<geometry_msgs::PoseStamped>("pose", 1, true);
-  this->path_pub     = this->nh.advertise<nav_msgs::Path>("path", 1, true);
-  this->kf_pose_pub  = this->nh.advertise<geometry_msgs::PoseArray>("kf_pose", 1, true);
+  // Advertise topics for publishing odometry, pose, path, and other data
+  this->odom_pub = this->nh.advertise<nav_msgs::Odometry>("odom", 1, true);
+  this->pose_pub = this->nh.advertise<geometry_msgs::PoseStamped>("pose", 1, true);
+  this->path_pub = this->nh.advertise<nav_msgs::Path>("path", 1, true);
+  this->kf_pose_pub = this->nh.advertise<geometry_msgs::PoseArray>("kf_pose", 1, true);
   this->kf_cloud_pub = this->nh.advertise<sensor_msgs::PointCloud2>("kf_cloud", 1, true);
   this->deskewed_pub = this->nh.advertise<sensor_msgs::PointCloud2>("deskewed", 1, true);
 
+  // Timer for periodic publishing of pose
   this->publish_timer = this->nh.createTimer(ros::Duration(0.01), &dlio::OdomNode::publishPose, this);
 
+  // Initialize transformation matrices
   this->T = Eigen::Matrix4f::Identity();
   this->T_prior = Eigen::Matrix4f::Identity();
   this->T_corr = Eigen::Matrix4f::Identity();
 
+  // Initialize state variables
   this->origin = Eigen::Vector3f(0., 0., 0.);
   this->state.p = Eigen::Vector3f(0., 0., 0.);
   this->state.q = Eigen::Quaternionf(1., 0., 0., 0.);
@@ -52,9 +57,11 @@ dlio::OdomNode::OdomNode(ros::NodeHandle node_handle) : nh(node_handle) {
   this->state.v.ang.b = Eigen::Vector3f(0., 0., 0.);
   this->state.v.ang.w = Eigen::Vector3f(0., 0., 0.);
 
+  // Initialize LiDAR pose
   this->lidarPose.p = Eigen::Vector3f(0., 0., 0.);
   this->lidarPose.q = Eigen::Quaternionf(1., 0., 0., 0.);
 
+  // Initialize IMU measurements
   this->imu_meas.stamp = 0.;
   this->imu_meas.ang_vel[0] = 0.;
   this->imu_meas.ang_vel[1] = 0.;
@@ -63,29 +70,34 @@ dlio::OdomNode::OdomNode(ros::NodeHandle node_handle) : nh(node_handle) {
   this->imu_meas.lin_accel[1] = 0.;
   this->imu_meas.lin_accel[2] = 0.;
 
+  // Set up IMU buffer
   this->imu_buffer.set_capacity(this->imu_buffer_size_);
   this->first_imu_stamp = 0.;
   this->prev_imu_stamp = 0.;
 
-  this->original_scan = pcl::PointCloud<PointType>::ConstPtr (boost::make_shared<const pcl::PointCloud<PointType>>());
-  this->deskewed_scan = pcl::PointCloud<PointType>::ConstPtr (boost::make_shared<const pcl::PointCloud<PointType>>());
-  this->current_scan = pcl::PointCloud<PointType>::ConstPtr (boost::make_shared<const pcl::PointCloud<PointType>>());
-  this->submap_cloud = pcl::PointCloud<PointType>::ConstPtr (boost::make_shared<const pcl::PointCloud<PointType>>());
+  // Initialize point clouds
+  this->original_scan = pcl::PointCloud<PointType>::ConstPtr(boost::make_shared<const pcl::PointCloud<PointType>>());
+  this->deskewed_scan = pcl::PointCloud<PointType>::ConstPtr(boost::make_shared<const pcl::PointCloud<PointType>>());
+  this->current_scan = pcl::PointCloud<PointType>::ConstPtr(boost::make_shared<const pcl::PointCloud<PointType>>());
+  this->submap_cloud = pcl::PointCloud<PointType>::ConstPtr(boost::make_shared<const pcl::PointCloud<PointType>>());
 
+  // Initialize keyframe-related variables
   this->num_processed_keyframes = 0;
-
   this->submap_hasChanged = true;
   this->submap_kf_idx_prev.clear();
 
+  // Initialize timestamps
   this->first_scan_stamp = 0.;
   this->elapsed_time = 0.;
   this->length_traversed;
 
+  // Initialize convex and concave hulls
   this->convex_hull.setDimension(3);
   this->concave_hull.setDimension(3);
   this->concave_hull.setAlpha(this->keyframe_thresh_dist_);
   this->concave_hull.setKeepInformation(true);
 
+  // Configure GICP (Generalized Iterative Closest Point) parameters
   this->gicp.setCorrespondenceRandomness(this->gicp_k_correspondences_);
   this->gicp.setMaxCorrespondenceDistance(this->gicp_max_corr_dist_);
   this->gicp.setMaximumIterations(this->gicp_max_iter_);
@@ -93,6 +105,7 @@ dlio::OdomNode::OdomNode(ros::NodeHandle node_handle) : nh(node_handle) {
   this->gicp.setRotationEpsilon(this->gicp_rotation_ep_);
   this->gicp.setInitialLambdaFactor(this->gicp_init_lambda_factor_);
 
+  // Configure temporary GICP parameters
   this->gicp_temp.setCorrespondenceRandomness(this->gicp_k_correspondences_);
   this->gicp_temp.setMaxCorrespondenceDistance(this->gicp_max_corr_dist_);
   this->gicp_temp.setMaximumIterations(this->gicp_max_iter_);
@@ -100,32 +113,38 @@ dlio::OdomNode::OdomNode(ros::NodeHandle node_handle) : nh(node_handle) {
   this->gicp_temp.setRotationEpsilon(this->gicp_rotation_ep_);
   this->gicp_temp.setInitialLambdaFactor(this->gicp_init_lambda_factor_);
 
+  // Set up search methods for GICP
   pcl::Registration<PointType, PointType>::KdTreeReciprocalPtr temp;
   this->gicp.setSearchMethodSource(temp, true);
   this->gicp.setSearchMethodTarget(temp, true);
   this->gicp_temp.setSearchMethodSource(temp, true);
   this->gicp_temp.setSearchMethodTarget(temp, true);
 
+  // Initialize geometric observer variables
   this->geo.first_opt_done = false;
   this->geo.prev_vel = Eigen::Vector3f(0., 0., 0.);
 
+  // Set verbosity level for PCL (Point Cloud Library)
   pcl::console::setVerbosityLevel(pcl::console::L_ERROR);
 
+  // Configure crop box filter
   this->crop.setNegative(true);
   this->crop.setMin(Eigen::Vector4f(-this->crop_size_, -this->crop_size_, -this->crop_size_, 1.0));
   this->crop.setMax(Eigen::Vector4f(this->crop_size_, this->crop_size_, this->crop_size_, 1.0));
 
+  // Configure voxel grid filter
   this->voxel.setLeafSize(this->vf_res_, this->vf_res_, this->vf_res_);
 
+  // Initialize metrics
   this->metrics.spaciousness.push_back(0.);
   this->metrics.density.push_back(this->gicp_max_corr_dist_);
 
-  // CPU Specs
+  // CPU specifications
   char CPUBrandString[0x40];
   memset(CPUBrandString, 0, sizeof(CPUBrandString));
-
   this->cpu_type = "";
 
+  // Additional CPU-related initialization (if supported)
   #ifdef HAS_CPUID
   unsigned int CPUInfo[4] = {0,0,0,0};
   __cpuid(0x80000000, CPUInfo[0], CPUInfo[1], CPUInfo[2], CPUInfo[3]);
@@ -143,10 +162,10 @@ dlio::OdomNode::OdomNode(ros::NodeHandle node_handle) : nh(node_handle) {
   boost::trim(this->cpu_type);
   #endif
 
+  // Initialize CPU usage tracking
   FILE* file;
   struct tms timeSample;
   char line[128];
-
   this->lastCPU = times(&timeSample);
   this->lastSysCPU = timeSample.tms_stime;
   this->lastUserCPU = timeSample.tms_utime;
@@ -157,9 +176,9 @@ dlio::OdomNode::OdomNode(ros::NodeHandle node_handle) : nh(node_handle) {
       if (strncmp(line, "processor", 9) == 0) this->numProcessors++;
   }
   fclose(file);
-
 }
 
+// Destructor for the OdomNode class
 dlio::OdomNode::~OdomNode() {}
 
 void dlio::OdomNode::getParams() {
