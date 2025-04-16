@@ -1,0 +1,40 @@
+###########################################################
+#                                                         #
+# Copyright (c)                                           #
+#                                                         #
+# The Verifiable & Control-Theoretic Robotics (VECTR) Lab #
+# University of California, Los Angeles                   #
+#                                                         #
+# Authors: Kenny J. Chen, Ryan Nemiroff, Brett T. Lopez   #
+# Contact: {kennyjchen, ryguyn, btlopez}@ucla.edu         #
+#                                                         #
+###########################################################
+
+/**:
+  ros__parameters:
+
+    version: 1.1.1
+
+    adaptive: true
+
+    pointcloud/deskew: true
+    pointcloud/voxelize: true
+
+    imu/calibration: false
+    imu/intrinsics/accel/bias: [ 0.0, 0.0, 0.0 ]
+    imu/intrinsics/accel/sm:   [ 1.,  0.,  0.,
+                                 0.,  1.,  0.,
+                                 0.,  0.,  1. ]
+    imu/intrinsics/gyro/bias: [ 0.0, 0.0, 0.0 ]
+
+    # IMU extrinsics (from body_to_imu_link)
+    extrinsics/baselink2imu/t: [ 0.0, 0.0, 0.0 ] 
+    extrinsics/baselink2imu/R: [ 1.,  0.,  0.,
+                                 0.,  1.,  0.,
+                                 0.,  0.,  1. ]
+
+    # LiDAR extrinsics (from base_link_to_laser_link)
+    extrinsics/baselink2lidar/t: [ 0.040, 0.0, 0.026 ]
+    extrinsics/baselink2lidar/R: [ 1.,  0.,  0.,
+                                   0.,  1.,  0.,
+                                   0.,  0.,  1. ]

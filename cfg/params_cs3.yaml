@@ -1,0 +1,239 @@
+###########################################################
+#                                                         #
+# Copyright (c)                                           #
+#                                                         #
+# The Verifiable & Control-Theoretic Robotics (VECTR) Lab #
+# University of California, Los Angeles                   #
+#                                                         #
+# Authors: Kenny J. Chen, Ryan Nemiroff, Brett T. Lopez   #
+# Contact: {kennyjchen, ryguyn, btlopez}@ucla.edu         #
+#                                                         #
+###########################################################
+
+/**:
+  ros__parameters:
+    # General Parameters
+    # use_sim_time:
+    # Type: Boolean
+    # Description: Enables the use of simulated time. This is useful when running the system with a recorded bag file or in a simulation environment.
+    # Default: true
+
+    # frames/odom:
+    # Type: String
+    # Description: The name of the odometry frame in the TF tree.
+    # Default: odom
+
+    # frames/baselink:
+    # Type: String
+    # Description: The name of the robot's base link frame in the TF tree.
+    # Default: body
+
+    # frames/lidar:
+    # Type: String
+    # Description: The name of the LiDAR frame in the TF tree.
+    # Default: laser_link
+
+    # frames/imu:
+    # Type: String
+    # Description: The name of the IMU frame in the TF tree.
+    # Default: imu_link
+    use_sim_time: true
+    frames/odom: odom
+    frames/baselink: body
+    frames/lidar: laser_link
+    frames/imu: imu_link
+
+    # Mapping Parameters
+    # map/waitUntilMove:
+    # Type: Boolean
+    # Description: If true, the mapping process will wait until the robot starts moving before generating a map.
+    # Default: false
+
+    # map/dense/filtered:
+    # Type: Boolean
+    # Description: If true, the dense map will be filtered to remove noise or unnecessary points.
+    # Default: false
+
+    # map/sparse/leafSize:
+    # Type: Float
+    # Description: The leaf size for downsampling the sparse map using a voxel grid filter.
+    # Default: 0.25 (meters)
+    map/waitUntilMove: false
+    map/dense/filtered: false
+    map/sparse/leafSize: 0.25
+
+    # Odometry Parameters
+    # odom/gravity:
+    # Type: Float
+    # Description: The gravitational constant used for IMU integration.
+    # Default: 9.80665 (m/s²)
+
+    # odom/computeTimeOffset:
+    # Type: Boolean
+    # Description: If true, the system will compute a time offset between the LiDAR and IMU data streams to synchronize them.
+    # Default: false
+    odom/gravity: 9.80665
+    odom/computeTimeOffset: true
+
+    # IMU Parameters
+    # odom/imu/approximateGravity:
+    # Type: Boolean
+    # Description: If true, the system will approximate the gravity vector from the IMU data.
+    # Default: false
+
+    # odom/imu/calibration/gyro:
+    # Type: Boolean
+    # Description: If true, the gyroscope in the IMU will be calibrated.
+    # Default: false
+
+    # odom/imu/calibration/accel:
+    # Type: Boolean
+    # Description: If true, the accelerometer in the IMU will be calibrated.
+    # Default: false
+
+    # odom/imu/calibration/time:
+    # Type: Float
+    # Description: The duration (in seconds) for calibrating the IMU.
+    # Default: 3.0 (seconds)
+
+    # odom/imu/bufferSize:
+    # Type: Integer
+    # Description: The size of the buffer used to store IMU data for deskewing and integration.
+    # Default: 5000
+    odom/imu/approximateGravity: true
+    odom/imu/calibration/gyro: false
+    odom/imu/calibration/accel: false
+    odom/imu/calibration/time: 3.0
+    odom/imu/bufferSize: 5000
+
+    # Preprocessing Parameters
+    # odom/preprocessing/cropBoxFilter/size:
+    # Type: Float
+    # Description: The size of the crop box filter used to remove points outside a specific region of interest.
+    # Default: 1.0 (meters)
+
+    # odom/preprocessing/voxelFilter/res:
+    # Type: Float
+    # Description: The resolution of the voxel grid filter used to downsample the point cloud.
+    # Default: 0.02 (meters)
+    # Keyframe Parameters
+
+    # odom/keyframe/threshD:
+    # Type: Float
+    # Description: The translational distance threshold for creating a new keyframe.
+    # Default: 1.0 (meters)
+
+    # odom/keyframe/threshR:
+    # Type: Float
+    # Description: The rotational angle threshold (in degrees) for creating a new keyframe.
+    # Default: 45.0 (degrees)
+    # Submap Parameters
+
+    # odom/submap/keyframe/knn:
+    # Type: Integer
+    # Description: The number of nearest neighbors to consider when building the submap.
+    # Default: 10
+
+    # odom/submap/keyframe/kcv:
+    # Type: Integer
+    # Description: The number of keyframes to consider for covariance estimation.
+    # Default: 10
+
+    # odom/submap/keyframe/kcc:
+    # Type: Integer
+    # Description: The number of keyframes to consider for consistency checks.
+    # Default: 10
+
+    odom/preprocessing/cropBoxFilter/size: 0.5
+    odom/preprocessing/voxelFilter/res: 0.02
+    odom/keyframe/threshD: 1.0
+    odom/keyframe/threshR: 20.0
+    odom/submap/keyframe/knn: 10
+    odom/submap/keyframe/kcv: 10
+    odom/submap/keyframe/kcc: 10
+
+    # GICP (Generalized Iterative Closest Point) Parameters
+    # odom/gicp/minNumPoints:
+    # Type: Integer
+    # Description: The minimum number of points required for GICP to run.
+    # Default: 64
+
+    # odom/gicp/kCorrespondences:
+    # Type: Integer
+    # Description: The number of correspondences to consider for GICP.
+    # Default: 16
+
+    # odom/gicp/maxCorrespondenceDistance:
+    # Type: Float
+    # Description: The maximum distance between correspondences for GICP.
+    # Default: 0.5 (meters)
+
+    # odom/gicp/maxIterations:
+    # Type: Integer
+    # Description: The maximum number of iterations for GICP to converge.
+    # Default: 32
+
+    # odom/gicp/transformationEpsilon:
+    # Type: Float
+    # Description: The convergence threshold for the transformation matrix in GICP.
+    # Default: 0.01
+
+    # odom/gicp/rotationEpsilon:
+    # Type: Float
+    # Description: The convergence threshold for the rotation matrix in GICP.
+    # Default: 0.01
+
+    # odom/gicp/initLambdaFactor:
+    # Type: Float
+    # Description: The initial lambda factor for the GICP optimization.
+    # Default: 1e-9
+    odom/gicp/minNumPoints: 64
+    odom/gicp/kCorrespondences: 16
+    odom/gicp/maxCorrespondenceDistance: 0.5
+    odom/gicp/maxIterations: 32
+    odom/gicp/transformationEpsilon: 0.01
+    odom/gicp/rotationEpsilon: 0.01
+    odom/gicp/initLambdaFactor: 1e-9
+
+    # Geometric Parameters
+    # odom/geo/Kp:
+    # Type: Float
+    # Description: Proportional gain for position control in the geometric model.
+    # Default: 4.5
+
+    # odom/geo/Kv:
+    # Type: Float
+    # Description: Velocity gain for position control in the geometric model.
+    # Default: 11.25
+
+    # odom/geo/Kq:
+    # Type: Float
+    # Description: Gain for orientation control in the geometric model.
+    # Default: 4.0
+
+    # odom/geo/Kab:
+    # Type: Float
+    # Description: Gain for accelerometer bias correction.
+    # Default: 2.25
+
+    # odom/geo/Kgb:
+    # Type: Float
+    # Description: Gain for gyroscope bias correction.
+    # Default: 1.0
+
+    # odom/geo/abias_max:
+    # Type: Float
+    # Description: Maximum allowable accelerometer bias.
+    # Default: 5.0
+
+    # odom/geo/gbias_max:
+    # Type: Float
+    # Description: Maximum allowable gyroscope bias.
+    # Default: 0.5
+    odom/geo/Kp: 4.5
+    odom/geo/Kv: 11.25
+    odom/geo/Kq: 4.0
+    odom/geo/Kab: 2.25
+    odom/geo/Kgb: 1.0
+    odom/geo/abias_max: 5.0
+    odom/geo/gbias_max: 0.5

@@ -522,9 +522,22 @@ void dlio::OdomNode::getScanFromROS(const sensor_msgs::msg::PointCloud2::SharedP
       break;
     }
   }
+  // if (this->sensor == dlio::SensorType::UNKNOWN) {
+  //   RCLCPP_WARN(this->get_logger(), "Unknown sensor type.");
+  // }
+  // if (this->sensor == dlio::SensorType::UNKNOWN) {
+  //   this->deskew_ = false;
+  // }
 
+  // Add a fallback for OPSYS
   if (this->sensor == dlio::SensorType::UNKNOWN) {
-    this->deskew_ = false;
+    if (pc->fields.size() == 4 && pc->fields[0].name == "x" && pc->fields[1].name == "y" &&
+        pc->fields[2].name == "z" && pc->fields[3].name == "intensity") {
+      this->sensor = dlio::SensorType::OPSYS;
+      RCLCPP_INFO(this->get_logger(), "Detected OPSYS sensor type.");
+    } else {
+      RCLCPP_WARN(this->get_logger(), "Unknown sensor type.");
+    }
   }
 
   this->scan_header_stamp = pc->header.stamp;
@@ -536,21 +549,30 @@ void dlio::OdomNode::preprocessPoints() {
 
   // Deskew the original dlio-type scan
   if (this->deskew_) {
-
+    RCLCPP_INFO(this->get_logger(), "Deskewing enabled. Deskewing point cloud...");
     this->deskewPointcloud();
 
     if (!this->first_valid_scan) {
+      RCLCPP_WARN(this->get_logger(), "First valid scan not received yet. Skipping preprocessing.");
       return;
     }
 
   } else {
+    RCLCPP_WARN(this->get_logger(), "Deskewing disabled.");
 
     this->scan_stamp = rclcpp::Time(this->scan_header_stamp).seconds();
 
     // don't process scans until IMU data is present
     if (!this->first_valid_scan) {
 
-      if (this->imu_buffer.empty() || this->scan_stamp <= this->imu_buffer.back().stamp) {
+        RCLCPP_WARN(this->get_logger(), "Waiting for IMU data to start processing scans.");
+
+      if (this->imu_buffer.empty()) {
+        RCLCPP_WARN(this->get_logger(), "imu_buffer.empty");
+        return;
+      }
+      if (this->scan_stamp <= this->imu_buffer.back().stamp) {
+        RCLCPP_WARN(this->get_logger(), "scan_stamp ,%f <= imu_buffer.back().stamp %f", this->scan_stamp,imu_buffer.back().stamp);
         return;
       }
 
@@ -558,7 +580,7 @@ void dlio::OdomNode::preprocessPoints() {
       this->T_prior = this->T; // assume no motion for the first scan
 
     } else {
-
+      RCLCPP_WARN(this->get_logger(), "Deskewing disabled. Processing scan %f", this->scan_stamp);
       // IMU prior for second scan onwards
     std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> frames;
       frames = this->integrateImu(this->prev_scan_stamp, this->lidarPose.q, this->lidarPose.p,
@@ -581,18 +603,20 @@ void dlio::OdomNode::preprocessPoints() {
 
   // Voxel Grid Filter
   if (this->vf_use_) {
+    RCLCPP_INFO(this->get_logger(), "Voxel filter enabled.");
     pcl::PointCloud<PointType>::Ptr current_scan_ = std::make_shared<pcl::PointCloud<PointType>>(*this->deskewed_scan);
     this->voxel.setInputCloud(current_scan_);
     this->voxel.filter(*current_scan_);
     this->current_scan = current_scan_;
   } else {
+    RCLCPP_WARN(this->get_logger(), "Voxel filter disabled.");
     this->current_scan = this->deskewed_scan;
   }
 
 }
 
 void dlio::OdomNode::deskewPointcloud() {
-
+  RCLCPP_INFO(this->get_logger(), "Deskewing point cloud...");
   pcl::PointCloud<PointType>::Ptr deskewed_scan_ = std::make_shared<pcl::PointCloud<PointType>>(1, this->original_scan->points.size());
   // deskewed_scan_->points.resize(this->original_scan->points.size());
   // individual point timestamps should be relative to this time
@@ -642,6 +666,18 @@ void dlio::OdomNode::deskewPointcloud() {
     extract_point_time = [&sweep_ref_time](boost::range::index_value<PointType&, long> pt)
       { return pt.value().timestamp * 1e-9f; };
   }
+  else if (this->sensor == dlio::SensorType::OPSYS) {
+
+    point_time_cmp = [](const PointType& p1, const PointType& p2)
+      { return false; };  // All points have the same timestamp, so no sorting is needed.
+
+    point_time_neq = [](boost::range::index_value<PointType&, long> p1,
+                        boost::range::index_value<PointType&, long> p2)
+      { return false; };  // All points have the same timestamp, so no filtering is needed.
+
+    extract_point_time = [&sweep_ref_time](boost::range::index_value<PointType&, long> pt)
+      { return sweep_ref_time; };  // Use the header.stamp as the timestamp for all points.
+}
 
   // copy points into deskewed_scan_ in order of timestamp
   std::partial_sort_copy(this->original_scan->points.begin(), this->original_scan->points.end(),
@@ -1926,6 +1962,11 @@ void dlio::OdomNode::debug() {
   } else if (this->sensor == dlio::SensorType::LIVOX) {
     std::cout << "| " << std::left << std::setfill(' ') << std::setw(66)
       << "Sensor Rates: Livox @ " + to_string_with_precision(avg_lidar_rate, 2)
+                                  + " Hz, IMU @ " + to_string_with_precision(avg_imu_rate, 2) + " Hz"
+      << "|" << std::endl;
+  } else if (this->sensor == dlio::SensorType::OPSYS) {
+    std::cout << "| " << std::left << std::setfill(' ') << std::setw(66)
+      << "Sensor Rates: Opsys @ " + to_string_with_precision(avg_lidar_rate, 2)
                                   + " Hz, IMU @ " + to_string_with_precision(avg_imu_rate, 2) + " Hz"
       << "|" << std::endl;
   } else {

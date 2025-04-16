@@ -66,10 +66,14 @@ source ~/ros2_ws/install/setup.bash
 Execute via:
 
 ```sh
-roslaunch direct_lidar_inertial_odometry dlio.launch \
+ros2 launch direct_lidar_inertial_odometry dlio.launch.py \
   rviz:={true, false} \
   pointcloud_topic:=/robot/lidar \
   imu_topic:=/robot/imu
+```
+
+```sh
+ros2 launch direct_lidar_inertial_odometry dlio.launch.py rviz:=true pointcloud_topic:=/lidar/scan_3D imu_topic:=/imu/data
 ```
 
 <details>
